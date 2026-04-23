@@ -1,597 +1,88 @@
 <!doctype html>
 <html lang="ko" class="h-full">
- <head>
+<head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Schedule Calendar</title>
+
+  <!-- 정상 CDN만 유지 -->
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
   <style>
-* { font-family: 'Noto Sans KR', sans-serif; box-sizing: border-box; }
-html, body { height: 100%; margin: 0; }
+    * { font-family: 'Noto Sans KR', sans-serif; box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
 
-.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
-.day-cell { min-height: 90px; border: 1px solid var(--border-color); padding: 4px; cursor: pointer; transition: background 0.15s; position: relative; overflow: hidden; }
-.day-cell:hover { background: var(--hover-bg); }
-.day-cell.today { background: var(--today-bg); }
-.day-cell.other-month { opacity: 0.35; }
-.day-cell.holiday .day-num, .day-cell.sunday .day-num { color: #e74c3c; }
-.day-cell.saturday .day-num { color: #3b82f6; }
-.day-num { font-size: 13px; font-weight: 600; padding: 2px 4px; }
-.event-pill { font-size: 10px; padding: 1px 5px; border-radius: 4px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; line-height: 1.5; }
-.event-pill.single { background: var(--event-single); color: #fff; }
-.event-pill.multi { background: var(--event-multi); color: #fff; border-radius: 4px; }
-.event-pill.holiday-pill { background: #fee2e2; color: #dc2626; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+    .day-cell { min-height: 90px; border: 1px solid #e8e6e1; padding: 4px; cursor: pointer; }
+    .day-num { font-size: 13px; font-weight: 600; }
 
-/* Week view */
-.week-row { display: grid; grid-template-columns: 60px 1fr; border-bottom: 1px solid var(--border-color); }
-.week-day-col { min-height: 80px; padding: 8px; border-left: 1px solid var(--border-color); cursor: pointer; }
-.week-day-col:hover { background: var(--hover-bg); }
-.week-day-col.today { background: var(--today-bg); }
+    .event-pill {
+      font-size: 10px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      background: #6366f1;
+      color: white;
+      margin-top: 2px;
+    }
+  </style>
+</head>
 
-/* Day view */
-.day-hour-row { display: grid; grid-template-columns: 60px 1fr; border-bottom: 1px solid var(--border-color); min-height: 50px; }
-.day-hour-content { padding: 4px 8px; cursor: pointer; }
-.day-hour-content:hover { background: var(--hover-bg); }
+<body>
 
-/* Swipe */
-.swipe-item { position: relative; overflow: hidden; transition: transform 0.2s; }
-.swipe-item .delete-bg { position: absolute; right: 0; top: 0; bottom: 0; width: 80px; background: #ef4444; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 13px; font-weight: 600; }
+<div id="calendar"></div>
 
-/* Modal */
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; display: flex; align-items: center; justify-content: center; }
-.modal-box { background: #fff; border-radius: 12px; padding: 24px; width: 90%; max-width: 420px; max-height: 85%; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+<script>
+let current = new Date();
+let events = {};
 
-/* Toast */
-.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 13px; z-index: 200; animation: toastIn 0.3s ease; }
-@keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
-
-/* View tabs */
-.view-tab { padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; border: none; }
-.view-tab.active { background: var(--accent); color: #fff; }
-.view-tab:not(.active) { background: transparent; color: var(--text-primary); }
-
-:root {
-  --bg: #f8f7f4;
-  --surface: #ffffff;
-  --text-primary: #1a1a2e;
-  --text-secondary: #64748b;
-  --accent: #6366f1;
-  --accent-hover: #4f46e5;
-  --border-color: #e8e6e1;
-  --hover-bg: #f1f0ed;
-  --today-bg: #eef2ff;
-  --event-single: #6366f1;
-  --event-multi: #0ea5e9;
+function formatDate(d) {
+  return d.toISOString().split('T')[0];
 }
-
-.btn-primary { background: var(--accent); color: #fff; border: none; padding: 8px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.15s; }
-.btn-primary:hover { background: var(--accent-hover); }
-.btn-secondary { background: var(--border-color); color: var(--text-primary); border: none; padding: 8px 20px; border-radius: 8px; font-size: 14px; cursor: pointer; }
-
-input, select, textarea { border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; font-size: 14px; width: 100%; outline: none; font-family: inherit; }
-input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(99,102,241,0.15); }
-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); display: block; margin-bottom: 4px; }
-
-@media (max-width: 640px) {
-  .day-cell { min-height: 60px; }
-  .day-num { font-size: 11px; }
-  .event-pill { font-size: 9px; }
-}
-</style>
-  <style>body { box-sizing: border-box; }</style>
- </head>
- <body class="h-full" style="background:var(--bg); color:var(--text-primary);">
-  <div id="app" class="h-full flex flex-col overflow-auto w-full"><!-- Header -->
-   <header class="flex items-center justify-between px-4 py-3" style="background:var(--surface); border-bottom:1px solid var(--border-color);">
-    <h1 id="calTitle" class="text-lg font-bold" style="color:var(--text-primary);">나의 일정</h1>
-    <div class="flex items-center gap-2"><button onclick="openHolidayModal()" class="p-2 rounded-lg hover:bg-gray-100" title="휴일 관리"><i data-lucide="star" style="width:18px;height:18px;color:var(--accent);"></i></button> <button onclick="goToday()" class="btn-secondary text-xs py-1 px-3">오늘</button>
-    </div>
-   </header><!-- Nav -->
-   <div class="flex items-center justify-between px-4 py-2" style="background:var(--surface);">
-    <div class="flex items-center gap-2"><button onclick="navPrev()" class="p-1 rounded hover:bg-gray-100"><i data-lucide="chevron-left" style="width:20px;height:20px;"></i></button> <span id="navLabel" class="font-semibold text-base" style="min-width:140px;text-align:center;"></span> <button onclick="navNext()" class="p-1 rounded hover:bg-gray-100"><i data-lucide="chevron-right" style="width:20px;height:20px;"></i></button>
-    </div>
-    <div class="flex gap-1 p-1 rounded-full" style="background:var(--border-color);"><button class="view-tab active" data-view="month" onclick="setView('month')">월</button> <button class="view-tab" data-view="week" onclick="setView('week')">주</button> <button class="view-tab" data-view="day" onclick="setView('day')">일</button>
-    </div>
-   </div><!-- Calendar body -->
-   <div id="calBody" class="flex-1 overflow-auto px-2 pb-4"></div><!-- FAB --> <button onclick="openEventModal()" style="position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:var(--accent);color:#fff;border:none;box-shadow:0 4px 16px rgba(99,102,241,0.4);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:50;"> <i data-lucide="plus" style="width:24px;height:24px;"></i> </button>
-  </div><!-- Event Modal -->
-  <div id="eventModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeEventModal()">
-   <div class="modal-box">
-    <div class="flex items-center justify-between mb-4">
-     <h2 id="eventModalTitle" class="font-bold text-lg">일정 추가</h2><button onclick="closeEventModal()" class="p-1 rounded hover:bg-gray-100"><i data-lucide="x" style="width:20px;height:20px;"></i></button>
-    </div>
-    <form id="eventForm" onsubmit="saveEvent(event)">
-     <div class="mb-3"><label for="evTitle">제목</label> <input id="evTitle" required placeholder="일정 제목">
-     </div>
-     <div class="mb-3 flex gap-2">
-      <div class="flex-1">
-       <label for="evStart">시작일</label><input id="evStart" type="date" required>
-      </div>
-      <div class="flex-1">
-       <label for="evEnd">종료일</label><input id="evEnd" type="date" required>
-      </div>
-     </div>
-     <div class="mb-3 flex gap-2">
-      <div class="flex-1">
-       <label for="evStartTime">시작 시간</label><input id="evStartTime" type="time">
-      </div>
-      <div class="flex-1">
-       <label for="evEndTime">종료 시간</label><input id="evEndTime" type="time">
-      </div>
-     </div>
-     <div class="mb-3"><label for="evColor">색상</label> <select id="evColor"> <option value="#6366f1">보라</option> <option value="#0ea5e9">파랑</option> <option value="#10b981">초록</option> <option value="#f59e0b">노랑</option> <option value="#ef4444">빨강</option> <option value="#ec4899">분홍</option> </select>
-     </div>
-     <div class="mb-4"><label for="evMemo">메모</label> <textarea id="evMemo" rows="2" placeholder="메모 (선택)"></textarea>
-     </div><input type="hidden" id="evEditId">
-     <div class="flex gap-2 justify-end"><button type="button" onclick="closeEventModal()" class="btn-secondary">취소</button> <button type="submit" class="btn-primary">저장</button>
-     </div>
-    </form>
-   </div>
-  </div><!-- Day Detail Modal -->
-  <div id="dayModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeDayModal()">
-   <div class="modal-box">
-    <div class="flex items-center justify-between mb-4">
-     <h2 id="dayModalTitle" class="font-bold text-lg"></h2><button onclick="closeDayModal()" class="p-1 rounded hover:bg-gray-100"><i data-lucide="x" style="width:20px;height:20px;"></i></button>
-    </div>
-    <div id="dayEventList"></div><button onclick="closeDayModal();openEventModal()" class="btn-primary w-full mt-3">+ 일정 추가</button>
-   </div>
-  </div><!-- Holiday Modal -->
-  <div id="holidayModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeHolidayModal()">
-   <div class="modal-box">
-    <div class="flex items-center justify-between mb-4">
-     <h2 class="font-bold text-lg">휴일 관리</h2><button onclick="closeHolidayModal()" class="p-1 rounded hover:bg-gray-100"><i data-lucide="x" style="width:20px;height:20px;"></i></button>
-    </div>
-    <form onsubmit="addHoliday(event)" class="flex gap-2 mb-4"><input id="holDate" type="date" required class="flex-1"> <input id="holName" placeholder="휴일 이름" required class="flex-1"> <button type="submit" class="btn-primary px-3">추가</button>
-    </form>
-    <div id="holidayList"></div>
-   </div>
-  </div>
-  <script>
-// ─── State ───
-let currentView = 'month';
-let viewDate = new Date();
-let events = JSON.parse(localStorage.getItem('cal_events') || '[]');
-let holidays = JSON.parse(localStorage.getItem('cal_holidays') || '[]');
-let selectedDate = null;
-
-function saveData() {
-  localStorage.setItem('cal_events', JSON.stringify(events));
-  localStorage.setItem('cal_holidays', JSON.stringify(holidays));
-}
-
-// ─── Config ───
-const defaultConfig = {
-  calendar_title: '나의 일정',
-  background_color: '#f8f7f4',
-  surface_color: '#ffffff',
-  text_color: '#1a1a2e',
-  accent_color: '#6366f1',
-  border_color: '#e8e6e1',
-  font_family: 'Noto Sans KR',
-  font_size: 14
-};
-
-function applyConfig(cfg) {
-  const t = cfg.calendar_title || defaultConfig.calendar_title;
-  document.getElementById('calTitle').textContent = t;
-
-  const r = document.documentElement;
-  r.style.setProperty('--bg', cfg.background_color || defaultConfig.background_color);
-  r.style.setProperty('--surface', cfg.surface_color || defaultConfig.surface_color);
-  r.style.setProperty('--text-primary', cfg.text_color || defaultConfig.text_color);
-  r.style.setProperty('--accent', cfg.accent_color || defaultConfig.accent_color);
-  r.style.setProperty('--border-color', cfg.border_color || defaultConfig.border_color);
-
-  const font = cfg.font_family || defaultConfig.font_family;
-  document.body.style.fontFamily = `${font}, sans-serif`;
-
-  const sz = cfg.font_size || defaultConfig.font_size;
-  document.body.style.fontSize = sz + 'px';
-}
-
-window.elementSdk.init({
-  defaultConfig,
-  onConfigChange: async (cfg) => { applyConfig(cfg); render(); },
-  mapToCapabilities: (cfg) => ({
-    recolorables: [
-      { get: () => cfg.background_color || defaultConfig.background_color, set: v => { cfg.background_color = v; window.elementSdk.setConfig({ background_color: v }); } },
-      { get: () => cfg.surface_color || defaultConfig.surface_color, set: v => { cfg.surface_color = v; window.elementSdk.setConfig({ surface_color: v }); } },
-      { get: () => cfg.text_color || defaultConfig.text_color, set: v => { cfg.text_color = v; window.elementSdk.setConfig({ text_color: v }); } },
-      { get: () => cfg.accent_color || defaultConfig.accent_color, set: v => { cfg.accent_color = v; window.elementSdk.setConfig({ accent_color: v }); } },
-      { get: () => cfg.border_color || defaultConfig.border_color, set: v => { cfg.border_color = v; window.elementSdk.setConfig({ border_color: v }); } }
-    ],
-    borderables: [],
-    fontEditable: { get: () => cfg.font_family || defaultConfig.font_family, set: v => { cfg.font_family = v; window.elementSdk.setConfig({ font_family: v }); } },
-    fontSizeable: { get: () => cfg.font_size || defaultConfig.font_size, set: v => { cfg.font_size = v; window.elementSdk.setConfig({ font_size: v }); } }
-  }),
-  mapToEditPanelValues: (cfg) => new Map([
-    ['calendar_title', cfg.calendar_title || defaultConfig.calendar_title]
-  ])
-});
-
-// ─── Helpers ───
-const DAYS = ['일','월','화','수','목','금','토'];
-const fmtDate = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-const parseD = s => { const p = s.split('-'); return new Date(+p[0], +p[1]-1, +p[2]); };
-const isToday = d => fmtDate(d) === fmtDate(new Date());
-const isHoliday = ds => holidays.find(h => h.date === ds);
-const getEventsForDate = ds => events.filter(e => ds >= e.start && ds <= e.end);
-const isMultiDay = e => e.start !== e.end;
-
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
-
-// ─── Views ───
-function setView(v) {
-  currentView = v;
-  document.querySelectorAll('.view-tab').forEach(b => b.classList.toggle('active', b.dataset.view === v));
-  render();
-}
-
-function navPrev() {
-  if (currentView === 'month') viewDate.setMonth(viewDate.getMonth() - 1);
-  else if (currentView === 'week') viewDate.setDate(viewDate.getDate() - 7);
-  else viewDate.setDate(viewDate.getDate() - 1);
-  render();
-}
-function navNext() {
-  if (currentView === 'month') viewDate.setMonth(viewDate.getMonth() + 1);
-  else if (currentView === 'week') viewDate.setDate(viewDate.getDate() + 7);
-  else viewDate.setDate(viewDate.getDate() + 1);
-  render();
-}
-function goToday() { viewDate = new Date(); render(); }
 
 function render() {
-  const label = document.getElementById('navLabel');
-  const body = document.getElementById('calBody');
+  const cal = document.getElementById('calendar');
+  cal.innerHTML = '';
 
-  if (currentView === 'month') {
-    label.textContent = `${viewDate.getFullYear()}년 ${viewDate.getMonth()+1}월`;
-    body.innerHTML = renderMonth();
-  } else if (currentView === 'week') {
-    const ws = getWeekStart(viewDate);
-    const we = new Date(ws); we.setDate(we.getDate() + 6);
-    label.textContent = `${ws.getMonth()+1}/${ws.getDate()} ~ ${we.getMonth()+1}/${we.getDate()}`;
-    body.innerHTML = renderWeek();
-  } else {
-    label.textContent = `${viewDate.getFullYear()}년 ${viewDate.getMonth()+1}월 ${viewDate.getDate()}일 (${DAYS[viewDate.getDay()]})`;
-    body.innerHTML = renderDay();
-  }
-  lucide.createIcons();
-}
+  const year = current.getFullYear();
+  const month = current.getMonth();
 
-function renderMonth() {
-  const y = viewDate.getFullYear(), m = viewDate.getMonth();
-  const first = new Date(y, m, 1);
-  const startDay = first.getDay();
-  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const last = new Date(year, month + 1, 0);
 
-  let html = '<div style="background:var(--surface);border-radius:12px;overflow:hidden;margin-top:8px;">';
-  html += '<div class="cal-grid" style="text-align:center;">';
-  DAYS.forEach((d, i) => {
-    const col = i === 0 ? 'color:#e74c3c' : i === 6 ? 'color:#3b82f6' : 'color:var(--text-secondary)';
-    html += `<div style="padding:8px 0;font-size:12px;font-weight:600;${col};border-bottom:1px solid var(--border-color);">${d}</div>`;
-  });
-  html += '</div><div class="cal-grid">';
+  for (let i = 1; i <= last.getDate(); i++) {
+    let d = new Date(year, month, i);
+    let key = formatDate(d);
 
-  const startDate = new Date(y, m, 1 - startDay);
-  const totalCells = Math.ceil((startDay + daysInMonth) / 7) * 7;
+    let div = document.createElement('div');
+    div.className = 'day-cell';
 
-  for (let i = 0; i < totalCells; i++) {
-    const d = new Date(startDate);
-    d.setDate(d.getDate() + i);
-    const ds = fmtDate(d);
-    const isOther = d.getMonth() !== m;
-    const dow = d.getDay();
-    let cls = 'day-cell';
-    if (isOther) cls += ' other-month';
-    if (isToday(d)) cls += ' today';
-    if (dow === 0) cls += ' sunday';
-    if (dow === 6) cls += ' saturday';
-    if (isHoliday(ds)) cls += ' holiday';
+    div.innerHTML = `<strong>${i}</strong>`;
 
-    const dayEvents = getEventsForDate(ds);
-    const hol = isHoliday(ds);
+    if (events[key]) {
+      events[key].forEach(e => {
+        let el = document.createElement('div');
+        el.className = 'event-pill';
+        el.textContent = e;
+        div.appendChild(el);
+      });
+    }
 
-    html += `<div class="${cls}" onclick="openDayDetail('${ds}')">`;
-    html += `<div class="day-num">${d.getDate()}</div>`;
-    if (hol) html += `<div class="event-pill holiday-pill">${hol.name}</div>`;
-    dayEvents.slice(0, 2).forEach(e => {
-      const type = isMultiDay(e) ? 'multi' : 'single';
-      html += `<div class="event-pill ${type}" style="background:${e.color || 'var(--event-single)'}">${e.title}</div>`;
-    });
-    if (dayEvents.length > 2) html += `<div style="font-size:10px;color:var(--text-secondary);padding-left:4px;">+${dayEvents.length - 2}개</div>`;
-    html += '</div>';
-  }
-  html += '</div></div>';
-  return html;
-}
-
-function getWeekStart(d) {
-  const r = new Date(d);
-  r.setDate(r.getDate() - r.getDay());
-  return r;
-}
-
-function renderWeek() {
-  const ws = getWeekStart(viewDate);
-  let html = '<div style="background:var(--surface);border-radius:12px;overflow:hidden;margin-top:8px;">';
-
-  // Day headers
-  html += '<div style="display:grid;grid-template-columns:60px repeat(7,1fr);border-bottom:1px solid var(--border-color);">';
-  html += '<div></div>';
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(ws); d.setDate(d.getDate() + i);
-    const col = i === 0 ? '#e74c3c' : i === 6 ? '#3b82f6' : 'var(--text-primary)';
-    const bg = isToday(d) ? 'var(--today-bg)' : 'transparent';
-    html += `<div style="text-align:center;padding:8px 4px;font-size:12px;font-weight:600;color:${col};background:${bg};">${DAYS[i]}<br><span style="font-size:16px;">${d.getDate()}</span></div>`;
-  }
-  html += '</div>';
-
-  // All-day / events area
-  html += '<div style="display:grid;grid-template-columns:60px repeat(7,1fr);min-height:200px;">';
-  html += '<div style="padding:8px 4px;font-size:11px;color:var(--text-secondary);text-align:center;">종일</div>';
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(ws); d.setDate(d.getDate() + i);
-    const ds = fmtDate(d);
-    const dayEvents = getEventsForDate(ds);
-    const hol = isHoliday(ds);
-    const bg = isToday(d) ? 'var(--today-bg)' : 'transparent';
-    html += `<div class="week-day-col" style="background:${bg};" onclick="openDayDetail('${ds}')">`;
-    if (hol) html += `<div class="event-pill holiday-pill" style="font-size:10px;">${hol.name}</div>`;
-    dayEvents.forEach(e => {
-      html += `<div class="event-pill" style="background:${e.color||'var(--event-single)'};color:#fff;font-size:10px;margin-bottom:2px;">${e.title}</div>`;
-    });
-    html += '</div>';
-  }
-  html += '</div></div>';
-  return html;
-}
-
-function renderDay() {
-  const ds = fmtDate(viewDate);
-  const dayEvents = getEventsForDate(ds);
-  const hol = isHoliday(ds);
-
-  let html = '<div style="background:var(--surface);border-radius:12px;overflow:hidden;margin-top:8px;">';
-
-  if (hol) {
-    html += `<div style="padding:8px 16px;background:#fee2e2;color:#dc2626;font-size:13px;font-weight:500;">🎉 ${hol.name}</div>`;
-  }
-
-  // Events summary
-  if (dayEvents.length) {
-    html += '<div style="padding:12px 16px;border-bottom:1px solid var(--border-color);">';
-    html += `<div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">일정 ${dayEvents.length}개</div>`;
-    dayEvents.forEach(e => {
-      const time = e.startTime ? `${e.startTime}${e.endTime ? ' ~ ' + e.endTime : ''}` : '종일';
-      html += `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border-color);cursor:pointer;" onclick="editEvent('${e.id}')">`;
-      html += `<div style="width:4px;height:32px;border-radius:2px;background:${e.color||'var(--accent)'};flex-shrink:0;"></div>`;
-      html += `<div><div style="font-weight:500;font-size:14px;">${e.title}</div><div style="font-size:12px;color:var(--text-secondary);">${time}${isMultiDay(e)?' ('+e.start+' ~ '+e.end+')':''}</div>`;
-      if (e.memo) html += `<div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">${e.memo}</div>`;
-      html += '</div></div>';
-    });
-    html += '</div>';
-  }
-
-  // Hour grid
-  for (let h = 0; h < 24; h++) {
-    const hh = String(h).padStart(2, '0');
-    html += `<div class="day-hour-row">`;
-    html += `<div style="padding:4px 8px;font-size:11px;color:var(--text-secondary);text-align:right;border-right:1px solid var(--border-color);">${hh}:00</div>`;
-    html += `<div class="day-hour-content" onclick="openEventModalAt('${ds}','${hh}:00')"></div>`;
-    html += '</div>';
-  }
-  html += '</div>';
-  return html;
-}
-
-// ─── Day Detail ───
-function openDayDetail(ds) {
-  selectedDate = ds;
-  const d = parseD(ds);
-  document.getElementById('dayModalTitle').textContent = `${d.getMonth()+1}월 ${d.getDate()}일 (${DAYS[d.getDay()]})`;
-
-  const evts = getEventsForDate(ds);
-  const hol = isHoliday(ds);
-  const list = document.getElementById('dayEventList');
-
-  let html = '';
-  if (hol) html += `<div style="padding:8px 12px;background:#fee2e2;color:#dc2626;border-radius:8px;margin-bottom:8px;font-size:13px;">🎉 ${hol.name}</div>`;
-
-  if (!evts.length && !hol) {
-    html += '<div style="text-align:center;padding:20px;color:var(--text-secondary);font-size:14px;">일정이 없습니다</div>';
-  }
-
-  evts.forEach(e => {
-    const time = e.startTime ? `${e.startTime}${e.endTime ? ' ~ ' + e.endTime : ''}` : '종일';
-    html += `<div class="swipe-item" data-id="${e.id}" style="margin-bottom:6px;border-radius:8px;overflow:hidden;position:relative;">`;
-    html += `<div class="delete-bg">삭제</div>`;
-    html += `<div class="swipe-content" style="position:relative;z-index:1;background:var(--surface);display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--border-color);border-radius:8px;cursor:pointer;" onclick="editEvent('${e.id}')">`;
-    html += `<div style="width:4px;height:36px;border-radius:2px;background:${e.color||'var(--accent)'};flex-shrink:0;"></div>`;
-    html += `<div style="flex:1;min-width:0;"><div style="font-weight:500;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.title}</div>`;
-    html += `<div style="font-size:12px;color:var(--text-secondary);">${time}${isMultiDay(e)?' · 연속일정':''}</div></div>`;
-    html += '</div></div>';
-  });
-
-  list.innerHTML = html;
-  document.getElementById('dayModal').style.display = 'flex';
-  lucide.createIcons();
-  initSwipe();
-}
-
-function closeDayModal() { document.getElementById('dayModal').style.display = 'none'; }
-
-// ─── Swipe to Delete ───
-function initSwipe() {
-  document.querySelectorAll('.swipe-item').forEach(el => {
-    let startX = 0, currentX = 0, swiping = false;
-    const content = el.querySelector('.swipe-content');
-    if (!content) return;
-
-    const onStart = (x) => { startX = x; swiping = true; content.style.transition = 'none'; };
-    const onMove = (x) => {
-      if (!swiping) return;
-      currentX = x - startX;
-      if (currentX < 0) content.style.transform = `translateX(${Math.max(currentX, -80)}px)`;
-    };
-    const onEnd = () => {
-      if (!swiping) return;
-      swiping = false;
-      content.style.transition = 'transform 0.2s';
-      if (currentX < -50) {
-        content.style.transform = 'translateX(-80px)';
-        // Add click to delete bg
-        el.querySelector('.delete-bg').onclick = () => {
-          const id = el.dataset.id;
-          events = events.filter(e => e.id !== id);
-          saveData();
-          el.style.transition = 'all 0.3s';
-          el.style.maxHeight = '0';
-          el.style.opacity = '0';
-          el.style.marginBottom = '0';
-          setTimeout(() => { render(); if(selectedDate) openDayDetail(selectedDate); }, 300);
-          showToast('일정이 삭제되었습니다');
-        };
-      } else {
-        content.style.transform = 'translateX(0)';
-      }
-      currentX = 0;
+    div.onclick = () => {
+      let text = prompt("일정 입력");
+      if (!text) return;
+      if (!events[key]) events[key] = [];
+      events[key].push(text);
+      render();
     };
 
-    content.addEventListener('touchstart', e => onStart(e.touches[0].clientX), { passive: true });
-    content.addEventListener('touchmove', e => onMove(e.touches[0].clientX), { passive: true });
-    content.addEventListener('touchend', onEnd);
-    content.addEventListener('mousedown', e => { onStart(e.clientX); const mm = ev => onMove(ev.clientX); const mu = () => { onEnd(); document.removeEventListener('mousemove', mm); document.removeEventListener('mouseup', mu); }; document.addEventListener('mousemove', mm); document.addEventListener('mouseup', mu); });
-  });
-}
-
-// ─── Event Modal ───
-function openEventModal() {
-  document.getElementById('eventForm').reset();
-  document.getElementById('evEditId').value = '';
-  document.getElementById('eventModalTitle').textContent = '일정 추가';
-  if (selectedDate) {
-    document.getElementById('evStart').value = selectedDate;
-    document.getElementById('evEnd').value = selectedDate;
-  } else {
-    const t = fmtDate(viewDate);
-    document.getElementById('evStart').value = t;
-    document.getElementById('evEnd').value = t;
+    cal.appendChild(div);
   }
-  document.getElementById('eventModal').style.display = 'flex';
 }
 
-function openEventModalAt(ds, time) {
-  selectedDate = ds;
-  openEventModal();
-  document.getElementById('evStartTime').value = time;
-}
-
-function closeEventModal() { document.getElementById('eventModal').style.display = 'none'; }
-
-function editEvent(id) {
-  const e = events.find(ev => ev.id === id);
-  if (!e) return;
-  closeDayModal();
-  document.getElementById('evEditId').value = e.id;
-  document.getElementById('evTitle').value = e.title;
-  document.getElementById('evStart').value = e.start;
-  document.getElementById('evEnd').value = e.end;
-  document.getElementById('evStartTime').value = e.startTime || '';
-  document.getElementById('evEndTime').value = e.endTime || '';
-  document.getElementById('evColor').value = e.color || '#6366f1';
-  document.getElementById('evMemo').value = e.memo || '';
-  document.getElementById('eventModalTitle').textContent = '일정 수정';
-  document.getElementById('eventModal').style.display = 'flex';
-}
-
-function saveEvent(e) {
-  e.preventDefault();
-  const editId = document.getElementById('evEditId').value;
-  const data = {
-    id: editId || uid(),
-    title: document.getElementById('evTitle').value,
-    start: document.getElementById('evStart').value,
-    end: document.getElementById('evEnd').value,
-    startTime: document.getElementById('evStartTime').value,
-    endTime: document.getElementById('evEndTime').value,
-    color: document.getElementById('evColor').value,
-    memo: document.getElementById('evMemo').value
-  };
-
-  if (data.end < data.start) { data.end = data.start; }
-
-  if (editId) {
-    events = events.map(ev => ev.id === editId ? data : ev);
-    showToast('일정이 수정되었습니다');
-  } else {
-    events.push(data);
-    showToast('일정이 추가되었습니다');
-  }
-  saveData();
-  closeEventModal();
-  render();
-}
-
-// ─── Holiday ───
-function openHolidayModal() {
-  renderHolidayList();
-  document.getElementById('holidayModal').style.display = 'flex';
-}
-function closeHolidayModal() { document.getElementById('holidayModal').style.display = 'none'; }
-
-function addHoliday(e) {
-  e.preventDefault();
-  const date = document.getElementById('holDate').value;
-  const name = document.getElementById('holName').value;
-  if (holidays.find(h => h.date === date)) {
-    showToast('이미 등록된 날짜입니다');
-    return;
-  }
-  holidays.push({ date, name });
-  saveData();
-  renderHolidayList();
-  render();
-  document.getElementById('holDate').value = '';
-  document.getElementById('holName').value = '';
-  showToast('휴일이 추가되었습니다');
-}
-
-function removeHoliday(date) {
-  holidays = holidays.filter(h => h.date !== date);
-  saveData();
-  renderHolidayList();
-  render();
-  showToast('휴일이 삭제되었습니다');
-}
-
-function renderHolidayList() {
-  const c = document.getElementById('holidayList');
-  if (!holidays.length) { c.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:13px;">등록된 휴일이 없습니다</div>'; return; }
-  const sorted = [...holidays].sort((a,b) => a.date.localeCompare(b.date));
-  c.innerHTML = sorted.map(h => `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-color);">
-    <div><span style="font-weight:500;">${h.name}</span><span style="font-size:12px;color:var(--text-secondary);margin-left:8px;">${h.date}</span></div>
-    <button onclick="removeHoliday('${h.date}')" style="background:none;border:none;cursor:pointer;color:#ef4444;padding:4px;"><i data-lucide="trash-2" style="width:16px;height:16px;"></i></button>
-  </div>`).join('');
-  lucide.createIcons();
-}
-
-// ─── Toast ───
-function showToast(msg) {
-  const t = document.createElement('div');
-  t.className = 'toast';
-  t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2000);
-}
-
-// ─── Init ───
-applyConfig(defaultConfig);
 render();
-lucide.createIcons();
 </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9f0caeb623503519',t:'MTc3Njk0NTM2MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+</body>
 </html>
