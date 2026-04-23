@@ -1,85 +1,108 @@
 <!doctype html>
-<html lang="ko" class="h-full">
+<html lang="ko">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Schedule Calendar</title>
+  <title>Calendar</title>
 
-  <!-- 정상 CDN만 유지 -->
-  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
-
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
 
   <style>
-    * { font-family: 'Noto Sans KR', sans-serif; box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; }
-
-    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
-    .day-cell { min-height: 90px; border: 1px solid #e8e6e1; padding: 4px; cursor: pointer; }
-    .day-num { font-size: 13px; font-weight: 600; }
-
-    .event-pill {
-      font-size: 10px;
-      padding: 2px 4px;
-      border-radius: 4px;
-      background: #6366f1;
-      color: white;
-      margin-top: 2px;
-    }
+    .grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+    .cell { border:1px solid #ddd; min-height:80px; padding:4px; cursor:pointer;}
+    .today { background:#eef2ff; }
+    .event { font-size:10px; background:#6366f1; color:#fff; border-radius:4px; padding:2px; margin-top:2px;}
   </style>
 </head>
 
-<body>
+<body class="p-4 bg-gray-100">
 
-<div id="calendar"></div>
+<div class="max-w-md mx-auto bg-white p-4 rounded shadow">
+
+  <div class="flex justify-between mb-4">
+    <button onclick="prev()">◀</button>
+    <h2 id="title"></h2>
+    <button onclick="next()">▶</button>
+  </div>
+
+  <div class="grid text-center font-bold mb-2">
+    <div>일</div><div>월</div><div>화</div><div>수</div>
+    <div>목</div><div>금</div><div>토</div>
+  </div>
+
+  <div id="calendar" class="grid"></div>
+</div>
 
 <script>
-let current = new Date();
-let events = {};
+let date = new Date();
+let events = JSON.parse(localStorage.getItem('events') || '{}');
 
-function formatDate(d) {
+function save(){
+  localStorage.setItem('events', JSON.stringify(events));
+}
+
+function key(d){
   return d.toISOString().split('T')[0];
 }
 
-function render() {
+function render(){
   const cal = document.getElementById('calendar');
-  cal.innerHTML = '';
+  const title = document.getElementById('title');
 
-  const year = current.getFullYear();
-  const month = current.getMonth();
+  cal.innerHTML = "";
 
-  const last = new Date(year, month + 1, 0);
+  let y = date.getFullYear();
+  let m = date.getMonth();
 
-  for (let i = 1; i <= last.getDate(); i++) {
-    let d = new Date(year, month, i);
-    let key = formatDate(d);
+  title.innerText = y + "년 " + (m+1) + "월";
+
+  let first = new Date(y,m,1);
+  let start = first.getDay();
+  let last = new Date(y,m+1,0).getDate();
+
+  for(let i=0;i<start;i++){
+    cal.innerHTML += "<div></div>";
+  }
+
+  for(let i=1;i<=last;i++){
+    let d = new Date(y,m,i);
+    let k = key(d);
 
     let div = document.createElement('div');
-    div.className = 'day-cell';
+    div.className = "cell";
 
-    div.innerHTML = `<strong>${i}</strong>`;
+    if(key(new Date()) === k){
+      div.classList.add("today");
+    }
 
-    if (events[key]) {
-      events[key].forEach(e => {
+    div.innerHTML = "<strong>"+i+"</strong>";
+
+    if(events[k]){
+      events[k].forEach(e=>{
         let el = document.createElement('div');
-        el.className = 'event-pill';
-        el.textContent = e;
+        el.className = "event";
+        el.innerText = e;
         div.appendChild(el);
       });
     }
 
-    div.onclick = () => {
+    div.onclick = ()=>{
       let text = prompt("일정 입력");
-      if (!text) return;
-      if (!events[key]) events[key] = [];
-      events[key].push(text);
+      if(!text) return;
+
+      if(!events[k]) events[k] = [];
+      events[k].push(text);
+
+      save();
       render();
     };
 
     cal.appendChild(div);
   }
 }
+
+function prev(){ date.setMonth(date.getMonth()-1); render(); }
+function next(){ date.setMonth(date.getMonth()+1); render(); }
 
 render();
 </script>
