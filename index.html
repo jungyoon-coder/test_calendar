@@ -1,64 +1,108 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Calendar</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <script src="https://cdn.tailwindcss.com"></script>
+<title>Calendar</title>
 
-  <style>
-    .grid { display: grid; grid-template-columns: repeat(7, 1fr); }
-    .cell { border:1px solid #ddd; min-height:80px; padding:4px; cursor:pointer;}
-    .today { background:#eef2ff; }
-    .event { font-size:10px; background:#6366f1; color:#fff; border-radius:4px; padding:2px; margin-top:2px;}
-  </style>
+<style>
+body {
+  font-family: Arial;
+  background: #f5f5f5;
+  margin: 0;
+  padding: 20px;
+}
+
+.container {
+  max-width: 600px;
+  margin: auto;
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+
+.day {
+  background: #fafafa;
+  border: 1px solid #ddd;
+  min-height: 80px;
+  padding: 5px;
+  cursor: pointer;
+}
+
+.today {
+  background: #dbeafe;
+}
+
+.event {
+  font-size: 10px;
+  background: #6366f1;
+  color: white;
+  padding: 2px;
+  border-radius: 4px;
+  margin-top: 3px;
+}
+</style>
 </head>
 
-<body class="p-4 bg-gray-100">
+<body>
 
-<div class="max-w-md mx-auto bg-white p-4 rounded shadow">
+<div class="container">
 
-  <div class="flex justify-between mb-4">
-    <button onclick="prev()">◀</button>
-    <h2 id="title"></h2>
-    <button onclick="next()">▶</button>
-  </div>
+<div class="header">
+  <button onclick="prev()">◀</button>
+  <h3 id="title"></h3>
+  <button onclick="next()">▶</button>
+</div>
 
-  <div class="grid text-center font-bold mb-2">
-    <div>일</div><div>월</div><div>화</div><div>수</div>
-    <div>목</div><div>금</div><div>토</div>
-  </div>
+<div class="grid" id="week">
+  <div>일</div><div>월</div><div>화</div>
+  <div>수</div><div>목</div><div>금</div><div>토</div>
+</div>
 
-  <div id="calendar" class="grid"></div>
+<div class="grid" id="calendar"></div>
+
 </div>
 
 <script>
-let date = new Date();
-let events = JSON.parse(localStorage.getItem('events') || '{}');
 
-function save(){
-  localStorage.setItem('events', JSON.stringify(events));
+let current = new Date();
+let events = JSON.parse(localStorage.getItem("events") || "{}");
+
+function save() {
+  localStorage.setItem("events", JSON.stringify(events));
 }
 
-function key(d){
-  return d.toISOString().split('T')[0];
+function key(d) {
+  return d.toISOString().split("T")[0];
 }
 
-function render(){
-  const cal = document.getElementById('calendar');
-  const title = document.getElementById('title');
+function render() {
+  const cal = document.getElementById("calendar");
+  const title = document.getElementById("title");
 
   cal.innerHTML = "";
 
-  let y = date.getFullYear();
-  let m = date.getMonth();
+  let y = current.getFullYear();
+  let m = current.getMonth();
 
   title.innerText = y + "년 " + (m+1) + "월";
 
-  let first = new Date(y,m,1);
+  let first = new Date(y, m, 1);
   let start = first.getDay();
-  let last = new Date(y,m+1,0).getDate();
+  let last = new Date(y, m+1, 0).getDate();
 
   for(let i=0;i<start;i++){
     cal.innerHTML += "<div></div>";
@@ -68,8 +112,8 @@ function render(){
     let d = new Date(y,m,i);
     let k = key(d);
 
-    let div = document.createElement('div');
-    div.className = "cell";
+    let div = document.createElement("div");
+    div.className = "day";
 
     if(key(new Date()) === k){
       div.classList.add("today");
@@ -79,7 +123,7 @@ function render(){
 
     if(events[k]){
       events[k].forEach(e=>{
-        let el = document.createElement('div');
+        let el = document.createElement("div");
         el.className = "event";
         el.innerText = e;
         div.appendChild(el);
@@ -101,10 +145,18 @@ function render(){
   }
 }
 
-function prev(){ date.setMonth(date.getMonth()-1); render(); }
-function next(){ date.setMonth(date.getMonth()+1); render(); }
+function prev(){
+  current.setMonth(current.getMonth()-1);
+  render();
+}
+
+function next(){
+  current.setMonth(current.getMonth()+1);
+  render();
+}
 
 render();
+
 </script>
 
 </body>
