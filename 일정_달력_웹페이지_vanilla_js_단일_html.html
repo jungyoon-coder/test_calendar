@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>일정 달력</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+    header { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #4f46e5; color: white; }
+    button { margin: 2px; }
+    .view { padding: 10px; }
+    .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+    .day { border: 1px solid #ddd; padding: 8px; min-height: 80px; position: relative; }
+    .holiday { background: #fee2e2; }
+    .event { background: #dbeafe; margin-top: 4px; padding: 2px 4px; border-radius: 4px; }
+    .controls { margin: 10px 0; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <button onclick="changeView('month')">월</button>
+    <button onclick="changeView('week')">주</button>
+    <button onclick="changeView('day')">일</button>
+  </div>
+  <div>
+    <button onclick="prev()">◀</button>
+    <span id="title"></span>
+    <button onclick="next()">▶</button>
+  </div>
+</header>
+
+<div class="view">
+  <div class="controls">
+    <input type="date" id="startDate">
+    <input type="date" id="endDate">
+    <input type="text" id="eventText" placeholder="일정 내용">
+    <button onclick="addEvent()">추가</button>
+    <button onclick="addHoliday()">휴일 지정</button>
+  </div>
+  <div id="calendar" class="calendar"></div>
+</div>
+
+<script>
+let current = new Date();
+let view = 'month';
+let events = JSON.parse(localStorage.getItem('events') || '{}');
+let holidays = JSON.parse(localStorage.getItem('holidays') || '{}');
+
+function save() {
+  localStorage.setItem('events', JSON.stringify(events));
+  localStorage.setItem('holidays', JSON.stringify(holidays));
+}
+
+function changeView(v) {
+  view = v;
+  render();
+}
+
+function prev() {
+  if (view === 'month') current.setMonth(current.getMonth() - 1);
+  if (view === 'week') current.setDate(current.getDate() - 7);
+  if (view === 'day') current.setDate(current.getDate() - 1);
+  render();
+}
+
+function next() {
+  if (view === 'month') current.setMonth(current.getMonth() + 1);
+  if (view === 'week') current.setDate(current.getDate() + 7);
+  if (view === 'day') current.setDate(current.getDate() + 1);
+  render();
+}
+
+function formatDate(d) {
+  return d.toISOString().split('T')[0];
+}
+
+function addEvent() {
+  const start = document.getElementById('startDate').value;
+  const end = document.getElementById('endDate').value || start;
+  const text = document.getElementById('eventText').value;
+  if (!start || !text) return;
+
+  let d = new Date(start);
+  let endDate = new Date(end);
+
+  while (d <= endDate) {
+    let key = formatDate(d);
+    if (!events[key]) events[key] = [];
+    events[key].push(text);
+    d.setDate(d.getDate() + 1);
+  }
+
+  save();
+  render();
+}
+
+function addHoliday() {
+  const date = document.getElementById('startDate').value;
+  if (!date) return;
+  holidays[date] = true;
+  save();
+  render();
+}
+
+function render() {
+  const cal = document.getElementById('calendar');
+  cal.innerHTML = '';
+
+  if (view === 'month') renderMonth();
+  if (view === 'week') renderWeek();
+  if (view === 'day') renderDay();
+}
+
+function createDayCell(date) {
+  const key = formatDate(date);
+  const div = document.createElement('div');
+  div.className = 'day';
+  if (holidays[key]) div.classList.add('holiday');
+
+  div.innerHTML = `<strong>${date.getDate()}</strong>`;
+
+  if (events[key]) {
+    events[key].forEach((e, i) => {
+      const el = document.createElement('div');
+      el.className = 'event';
+      el.textContent = e;
+
+      // swipe delete (simple version)
+      let startX = 0;
+      el.addEventListener('touchstart', ev => startX = ev.touches[0].clientX);
+      el.addEventListener('touchend', ev => {
+        let diff = ev.changedTouches[0].clientX - startX;
+        if (Math.abs(diff) > 50) {
+          events[key].splice(i, 1);
+          save();
+          render();
+        }
+      });
+
+      div.appendChild(el);
+    });
+  }
+
+  return div;
+}
+
+function renderMonth() {
+  const year = current.getFullYear();
+  const month = current.getMonth();
+  document.getElementById('title').textContent = `${year}년 ${month + 1}월`;
+
+  let first = new Date(year, month, 1);
+  let last = new Date(year, month + 1, 0);
+
+  for (let i = 1; i <= last.getDate(); i++) {
+    let d = new Date(year, month, i);
+    document.getElementById('calendar').appendChild(createDayCell(d));
+  }
+}
+
+function renderWeek() {
+  let start = new Date(current);
+  start.setDate(start.getDate() - start.getDay());
+
+  document.getElementById('title').textContent = '주간 보기';
+
+  for (let i = 0; i < 7; i++) {
+    let d = new Date(start);
+    d.setDate(start.getDate() + i);
+    document.getElementById('calendar').appendChild(createDayCell(d));
+  }
+}
+
+function renderDay() {
+  document.getElementById('title').textContent = formatDate(current);
+  document.getElementById('calendar').appendChild(createDayCell(current));
+}
+
+render();
+</script>
+
+</body>
+</html>
